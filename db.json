@@ -1,0 +1,30 @@
+{
+  "articles": [
+    {
+      "id": 1,
+      "titre": "Grand Meeting de l'UCO : Ensemble pour la Construction de la RDC",
+      "contenu": "Le Président National Mukoko Samba a réuni plus de 10 000 militants au Stade des Martyrs pour présenter la vision de l'UCO pour l'avenir de la République Démocratique du Congo. Cet événement historique marque le début d'une nouvelle ère pour notre parti et notre pays.",
+      "excerpt": "Le Président National Mukoko Samba a réuni plus de 10 000 militants au Stade des Martyrs...",
+      "categorie": "meeting",
+      "auteur": "UCO Communication",
+      "image": "",
+      "videoId": "",
+      "videoLink": "",
+      "date_publication": "2026-04-15T10:00:00.000Z",
+      "statut": "publie"
+    },
+    {
+      "id": 2,
+      "titre": "Communiqué Officiel : Position de l'UCO sur les Réformes",
+      "contenu": "L'UCO, par la voix de son Secrétaire Général, a publié un communiqué officiel concernant les réformes électorales en cours. Notre parti réaffirme son engagement pour des élections transparentes et démocratiques.",
+      "excerpt": "L'UCO a publié un communiqué officiel concernant les réformes électorales...",
+      "categorie": "communique",
+      "auteur": "Secrétariat Général UCO",
+      "image": "",
+      "videoId": "",
+      "videoLink": "",
+      "date_publication": "2026-04-20T14:30:00.000Z",
+      "statut": "publie"
+    }
+  ]
+}
