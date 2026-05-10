@@ -20,7 +20,7 @@ server.use(middlewares);
 // ENDPOINTS CUSTOM : VUES ET LIKES
 // ============================================
 
-// 🔥 POST /articles/:id/view - Incrementer les vues (POST au lieu de GET)
+// POST /articles/:id/view - Incrementer les vues
 server.post('/articles/:id/view', (req, res) => {
   const db = router.db;
   const article = db.get('articles').find({ id: parseInt(req.params.id) }).value();
@@ -42,7 +42,7 @@ server.post('/articles/:id/view', (req, res) => {
   });
 });
 
-// ❤️ POST /articles/:id/like - Ajouter un like (1 par IP)
+// POST /articles/:id/like - Ajouter un like (1 par IP)
 server.post('/articles/:id/like', (req, res) => {
   const db = router.db;
   const article = db.get('articles').find({ id: parseInt(req.params.id) }).value();
@@ -81,7 +81,7 @@ server.post('/articles/:id/like', (req, res) => {
   });
 });
 
-// 📊 GET /stats - Statistiques globales (pour l'admin)
+// GET /stats - Statistiques globales (pour l'admin)
 server.get('/stats', (req, res) => {
   const db = router.db;
   const articles = db.get('articles').value() || [];
