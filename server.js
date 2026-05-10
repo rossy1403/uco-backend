@@ -19,7 +19,6 @@ server.use(middlewares);
 function getTodayRDC() {
   const now = new Date();
   // RDC = UTC+2 (heure d'été) ou UTC+1 (heure d'hiver)
-  // On utilise UTC+2 par défaut
   const rdcOffset = 2 * 60 * 60 * 1000; // 2 heures en ms
   const rdcTime = new Date(now.getTime() + rdcOffset);
   return rdcTime.toISOString().split('T')[0];
@@ -90,7 +89,7 @@ server.post('/articles/:id/like', (req, res) => {
 });
 
 // ============================================
-// GET /stats - Statistiques globales (CORRIGE)
+// GET /stats - Statistiques globales (CORRIGE AVEC DEBUG)
 // ============================================
 server.get('/stats', (req, res) => {
   const db = router.db;
@@ -100,16 +99,24 @@ server.get('/stats', (req, res) => {
   const totalLikes = articles.reduce((sum, a) => sum + (a.likes || 0), 0);
   const totalArticles = articles.length;
 
-  // 🔥 CORRECTION : Date aujourd'hui en RDC (UTC+2)
+  // Date aujourd'hui en RDC (UTC+2)
   const today = getTodayRDC();
   console.log('📅 Date RDC aujourd'hui :', today);
+  console.log('📅 Date UTC aujourd'hui :', new Date().toISOString().split('T')[0]);
 
+  // 🔥 CORRECTION : Comparer les dates correctement
   const todayArticles = articles.filter(a => {
-    if (!a.date_publication) return false;
+    if (!a.date_publication) {
+      console.log('   ⚠️ Article sans date :', a.id, a.titre);
+      return false;
+    }
+
     // Extraire juste la date (YYYY-MM-DD) de l'article
     const articleDate = a.date_publication.split('T')[0];
-    console.log('   Article date :', articleDate, '| Aujourd'hui :', today, '| Match :', articleDate === today);
-    return articleDate === today;
+    const isToday = articleDate === today;
+
+    console.log('   Article :', a.id, '| date :', articleDate, '| today :', today, '| match :', isToday);
+    return isToday;
   }).length;
 
   // Articles cette semaine (7 derniers jours)
@@ -120,7 +127,7 @@ server.get('/stats', (req, res) => {
     return new Date(a.date_publication) >= oneWeekAgo;
   }).length;
 
-  console.log('📊 Stats :', { totalArticles, todayArticles, weekArticles, totalViews, totalLikes });
+  console.log('📊 Stats finales :', { totalArticles, todayArticles, weekArticles, totalViews, totalLikes });
 
   res.json({
     totalArticles,
