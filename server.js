@@ -1,13 +1,10 @@
 const jsonServer = require('json-server');
 const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
 
 const server = jsonServer.create();
 const router = jsonServer.router('db.json');
 const middlewares = jsonServer.defaults();
 
-// Activer CORS pour que le frontend puisse appeler l'API
 server.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
@@ -17,10 +14,20 @@ server.use(cors({
 server.use(middlewares);
 
 // ============================================
-// ENDPOINTS CUSTOM : VUES ET LIKES
+// FONCTION : Date du jour en RDC (UTC+2)
 // ============================================
+function getTodayRDC() {
+  const now = new Date();
+  // RDC = UTC+2 (heure d'été) ou UTC+1 (heure d'hiver)
+  // On utilise UTC+2 par défaut
+  const rdcOffset = 2 * 60 * 60 * 1000; // 2 heures en ms
+  const rdcTime = new Date(now.getTime() + rdcOffset);
+  return rdcTime.toISOString().split('T')[0];
+}
 
+// ============================================
 // POST /articles/:id/view - Incrementer les vues
+// ============================================
 server.post('/articles/:id/view', (req, res) => {
   const db = router.db;
   const article = db.get('articles').find({ id: parseInt(req.params.id) }).value();
@@ -42,7 +49,9 @@ server.post('/articles/:id/view', (req, res) => {
   });
 });
 
+// ============================================
 // POST /articles/:id/like - Ajouter un like (1 par IP)
+// ============================================
 server.post('/articles/:id/like', (req, res) => {
   const db = router.db;
   const article = db.get('articles').find({ id: parseInt(req.params.id) }).value();
@@ -54,7 +63,6 @@ server.post('/articles/:id/like', (req, res) => {
   const userIP = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
   const likedIPs = article.likedIPs || [];
 
-  // Verifier si cette IP a deja like
   if (likedIPs.includes(userIP)) {
     return res.status(400).json({ 
       error: 'Deja like',
@@ -81,7 +89,9 @@ server.post('/articles/:id/like', (req, res) => {
   });
 });
 
-// GET /stats - Statistiques globales (pour l'admin)
+// ============================================
+// GET /stats - Statistiques globales (CORRIGE)
+// ============================================
 server.get('/stats', (req, res) => {
   const db = router.db;
   const articles = db.get('articles').value() || [];
@@ -90,19 +100,27 @@ server.get('/stats', (req, res) => {
   const totalLikes = articles.reduce((sum, a) => sum + (a.likes || 0), 0);
   const totalArticles = articles.length;
 
-  // Articles publies aujourd'hui
-  const today = new Date().toISOString().split('T')[0];
+  // 🔥 CORRECTION : Date aujourd'hui en RDC (UTC+2)
+  const today = getTodayRDC();
+  console.log('📅 Date RDC aujourd'hui :', today);
+
   const todayArticles = articles.filter(a => {
-    const articleDate = new Date(a.date_publication).toISOString().split('T')[0];
+    if (!a.date_publication) return false;
+    // Extraire juste la date (YYYY-MM-DD) de l'article
+    const articleDate = a.date_publication.split('T')[0];
+    console.log('   Article date :', articleDate, '| Aujourd'hui :', today, '| Match :', articleDate === today);
     return articleDate === today;
   }).length;
 
-  // Articles cette semaine
+  // Articles cette semaine (7 derniers jours)
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   const weekArticles = articles.filter(a => {
+    if (!a.date_publication) return false;
     return new Date(a.date_publication) >= oneWeekAgo;
   }).length;
+
+  console.log('📊 Stats :', { totalArticles, todayArticles, weekArticles, totalViews, totalLikes });
 
   res.json({
     totalArticles,
@@ -114,7 +132,7 @@ server.get('/stats', (req, res) => {
 });
 
 // ============================================
-// ROUTER JSON SERVER (articles CRUD)
+// ROUTER JSON SERVER
 // ============================================
 server.use(router);
 
