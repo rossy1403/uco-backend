@@ -11,7 +11,10 @@
       "videoId": "",
       "videoLink": "",
       "date_publication": "2026-04-15T10:00:00.000Z",
-      "statut": "publie"
+      "statut": "publie",
+      "views": 0,
+      "likes": 0,
+      "likedIPs": []
     },
     {
       "id": 2,
@@ -24,8 +27,11 @@
       "videoId": "",
       "videoLink": "",
       "date_publication": "2026-04-20T14:30:00.000Z",
-      "statut": "publie"
-    },
-    "messages": []
-  ]
+      "statut": "publie",
+      "views": 0,
+      "likes": 0,
+      "likedIPs": []
+    }
+  ],
+  "messages": []
 }
