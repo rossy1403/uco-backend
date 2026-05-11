@@ -18,10 +18,15 @@ server.use(middlewares);
 // ============================================
 function getTodayRDC() {
   const now = new Date();
-  // RDC = UTC+2 (heure d'été) ou UTC+1 (heure d'hiver)
-  const rdcOffset = 2 * 60 * 60 * 1000; // 2 heures en ms
+  const rdcOffset = 2 * 60 * 60 * 1000;
   const rdcTime = new Date(now.getTime() + rdcOffset);
   return rdcTime.toISOString().split('T')[0];
+}
+
+function getNowRDC() {
+  const now = new Date();
+  const rdcOffset = 2 * 60 * 60 * 1000;
+  return new Date(now.getTime() + rdcOffset).toISOString();
 }
 
 // ============================================
@@ -89,7 +94,7 @@ server.post('/articles/:id/like', (req, res) => {
 });
 
 // ============================================
-// GET /stats - Statistiques globales (CORRIGE AVEC DEBUG)
+// GET /stats - Statistiques globales
 // ============================================
 server.get('/stats', (req, res) => {
   const db = router.db;
@@ -99,35 +104,19 @@ server.get('/stats', (req, res) => {
   const totalLikes = articles.reduce((sum, a) => sum + (a.likes || 0), 0);
   const totalArticles = articles.length;
 
-  // Date aujourd'hui en RDC (UTC+2)
   const today = getTodayRDC();
-  console.log('📅 Date RDC aujourd'hui :', today);
-  console.log('📅 Date UTC aujourd'hui :', new Date().toISOString().split('T')[0]);
-
-  // 🔥 CORRECTION : Comparer les dates correctement
   const todayArticles = articles.filter(a => {
-    if (!a.date_publication) {
-      console.log('   ⚠️ Article sans date :', a.id, a.titre);
-      return false;
-    }
-
-    // Extraire juste la date (YYYY-MM-DD) de l'article
+    if (!a.date_publication) return false;
     const articleDate = a.date_publication.split('T')[0];
-    const isToday = articleDate === today;
-
-    console.log('   Article :', a.id, '| date :', articleDate, '| today :', today, '| match :', isToday);
-    return isToday;
+    return articleDate === today;
   }).length;
 
-  // Articles cette semaine (7 derniers jours)
   const oneWeekAgo = new Date();
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
   const weekArticles = articles.filter(a => {
     if (!a.date_publication) return false;
     return new Date(a.date_publication) >= oneWeekAgo;
   }).length;
-
-  console.log('📊 Stats finales :', { totalArticles, todayArticles, weekArticles, totalViews, totalLikes });
 
   res.json({
     totalArticles,
@@ -139,6 +128,137 @@ server.get('/stats', (req, res) => {
 });
 
 // ============================================
+// MESSAGES CONTACT - NOUVEAU
+// ============================================
+
+// POST /messages - Envoyer un message (depuis contact.html)
+server.post('/messages', (req, res) => {
+  const db = router.db;
+  const message = req.body;
+
+  // Validation
+  if (!message.nom || !message.prenom || !message.email || !message.sujet || !message.message) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Nom, prenom, email, sujet et message sont obligatoires' 
+    });
+  }
+
+  const newMessage = {
+    id: Date.now(),
+    nom: message.nom,
+    prenom: message.prenom,
+    email: message.email,
+    telephone: message.telephone || '',
+    sujet: message.sujet,
+    message: message.message,
+    statut: 'non_lu',
+    date_envoi: getNowRDC(),
+    date_lecture: null,
+    reponse: null,
+    date_reponse: null
+  };
+
+  db.get('messages').push(newMessage).write();
+
+  res.json({
+    success: true,
+    message: 'Message envoye avec succes',
+    data: newMessage
+  });
+});
+
+// GET /messages - Lister les messages (pour l'admin)
+server.get('/messages', (req, res) => {
+  const db = router.db;
+  let messages = db.get('messages').value() || [];
+
+  const statut = req.query.statut;
+  const limit = parseInt(req.query.limit) || 50;
+  const offset = parseInt(req.query.offset) || 0;
+
+  // Filtrer par statut
+  if (statut && ['non_lu', 'lu', 'repondu'].includes(statut)) {
+    messages = messages.filter(m => m.statut === statut);
+  }
+
+  // Trier par date (plus recent d'abord)
+  messages = messages.sort((a, b) => new Date(b.date_envoi) - new Date(a.date_envoi));
+
+  // Pagination
+  const totalMessages = messages.length;
+  messages = messages.slice(offset, offset + limit);
+
+  // Stats
+  const allMessages = db.get('messages').value() || [];
+  const stats = {
+    total: allMessages.length,
+    non_lu: allMessages.filter(m => m.statut === 'non_lu').length,
+    lu: allMessages.filter(m => m.statut === 'lu').length,
+    repondu: allMessages.filter(m => m.statut === 'repondu').length
+  };
+
+  res.json({
+    success: true,
+    message: totalMessages + ' message(s) trouve(s)',
+    data: {
+      messages,
+      stats
+    }
+  });
+});
+
+// PUT /messages/:id - Marquer comme lu ou repondre
+server.put('/messages/:id', (req, res) => {
+  const db = router.db;
+  const id = parseInt(req.params.id);
+  const { action, reponse } = req.body;
+
+  const message = db.get('messages').find({ id }).value();
+
+  if (!message) {
+    return res.status(404).json({ success: false, message: 'Message non trouve' });
+  }
+
+  if (action === 'lu') {
+    db.get('messages')
+      .find({ id })
+      .assign({ statut: 'lu', date_lecture: getNowRDC() })
+      .write();
+
+    res.json({ success: true, message: 'Message marque comme lu' });
+  } else if (action === 'repondu') {
+    if (!reponse) {
+      return res.status(400).json({ success: false, message: 'La reponse est obligatoire' });
+    }
+    db.get('messages')
+      .find({ id })
+      .assign({ statut: 'repondu', reponse, date_reponse: getNowRDC() })
+      .write();
+
+    res.json({ success: true, message: 'Reponse enregistree' });
+  } else {
+    res.status(400).json({ success: false, message: 'Action non reconnue' });
+  }
+});
+
+// DELETE /messages/:id - Supprimer un message
+server.delete('/messages/:id', (req, res) => {
+  const db = router.db;
+  const id = parseInt(req.params.id);
+
+  const message = db.get('messages').find({ id }).value();
+
+  if (!message) {
+    return res.status(404).json({ success: false, message: 'Message non trouve' });
+  }
+
+  db.get('messages').remove({ id }).write();
+
+  res.json({ success: true, message: 'Message supprime' });
+});
+
+// ============================================
 // ROUTER JSON SERVER
 // ============================================
 server.use(router);
@@ -146,8 +266,10 @@ server.use(router);
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log('🚀 UCO Backend API running on port ' + PORT);
-  console.log('📰 Articles endpoint: http://localhost:' + PORT + '/articles');
+  console.log('📰 Articles endpoint: GET/POST /articles');
   console.log('👁️  Views endpoint: POST /articles/:id/view');
   console.log('❤️  Likes endpoint: POST /articles/:id/like');
   console.log('📊 Stats endpoint: GET /stats');
+  console.log('📧 Messages endpoint: GET/POST /messages');
+  console.log('📧 Message detail: GET/PUT/DELETE /messages/:id');
 });
